@@ -1,9 +1,10 @@
+from io import BytesIO
+
 import imageio
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-from mpl_toolkits import mplot3d
-from numpy import *
 import numpy as np
+from matplotlib.gridspec import GridSpec
+from numpy import *
 from scipy.optimize import minimize
 from tqdm import tqdm
 
@@ -33,7 +34,7 @@ class PID:
 
 def find_error(theta):
     # We only care about the minimum angle between the equilibrium and the current angle
-    new_error = (theta % (2 * pi))
+    new_error = theta % (2 * pi)
     if new_error > pi:
         new_error = new_error - 2 * pi
     return new_error
@@ -42,16 +43,27 @@ def find_error(theta):
 class ArmPole(object):
     # This function was adapted from
     # https://github.com/CodeReclaimers/neat-python/blob/master/examples/single-pole-balancing/cart_pole.py
-    def __init__(self, x=None, theta=None, dx=None, dtheta=None,
-                 position_limit=2.4, angle_limit_radians=45 * pi / 180):
+    def __init__(
+        self,
+        x=None,
+        theta=None,
+        dx=None,
+        dtheta=None,
+        position_limit=2.4,
+        angle_limit_radians=45 * pi / 180,
+    ):
         self.position_limit = position_limit
         self.angle_limit_radians = angle_limit_radians
 
         if x is None:
-            x = random.uniform(-0.5 * self.position_limit, 0.5 * self.position_limit)
+            x = random.uniform(
+                -0.5 * self.position_limit, 0.5 * self.position_limit
+            )
 
         if theta is None:
-            theta = random.uniform(-0.5 * self.angle_limit_radians, 0.5 * self.angle_limit_radians)
+            theta = random.uniform(
+                -0.5 * self.angle_limit_radians, 0.5 * self.angle_limit_radians
+            )
 
         if dx is None:
             dx = random.uniform(-1.0, 1.0)
@@ -84,17 +96,21 @@ class ArmPole(object):
         xacc0 = self.xacc
 
         # Update position/angle.
-        self.x += dt * self.dx + 0.5 * xacc0 * dt ** 2
-        self.theta += dt * self.dtheta + 0.5 * tacc0 * dt ** 2
+        self.x += dt * self.dx + 0.5 * xacc0 * dt**2
+        self.theta += dt * self.dtheta + 0.5 * tacc0 * dt**2
 
         # Compute new accelerations as given in "Correct equations for the dynamics of the cart-pole system"
         # by Razvan V. Florian (http://florian.io).
         # http://coneural.org/florian/papers/05_cart_pole.pdf
         st = sin(self.theta)
         ct = cos(self.theta)
-        tacc1 = (GRAV * st + ct * (-force - MROD * LROD * self.dtheta ** 2 * st) / mt) / (
-                    LROD * (4.0 / 3 - MROD * ct ** 2 / mt))
-        xacc1 = (force + MROD * LROD * (self.dtheta ** 2 * st - tacc1 * ct)) / mt
+        tacc1 = (
+            GRAV * st
+            + ct * (-force - MROD * LROD * self.dtheta**2 * st) / mt
+        ) / (LROD * (4.0 / 3 - MROD * ct**2 / mt))
+        xacc1 = (
+            force + MROD * LROD * (self.dtheta**2 * st - tacc1 * ct)
+        ) / mt
 
         # Update velocities.
         self.dx += 0.5 * (xacc0 + xacc1) * dt
@@ -135,17 +151,26 @@ def err_func(args, n_perturbations=10):
     sum = 0
     for seed in range(n_perturbations):
         np.random.seed(seed)
-        AP = ArmPole(x=np.random.uniform(-1.5, 1.5), dx=0, theta=np.random.uniform(-0.3, 0.3), dtheta=0)
+        AP = ArmPole(
+            x=np.random.uniform(-1.5, 1.5),
+            dx=0,
+            theta=np.random.uniform(-0.3, 0.3),
+            dtheta=0,
+        )
         xs, thetas, Fs, ts = simulate(args, AP)
         sum += np.log(np.sum(np.square(thetas) + np.square(xs)))
     return sum
 
 
-def make_simulations(params, fname, simple_plot=False, doublePID = True):
-
+def make_simulations(params, fname, simple_plot=False, doublePID=True):
     for seed in range(NSIMS):
         np.random.seed(seed)
-        AP = ArmPole(x=np.random.uniform(-1.5, 1.5), dx=0, theta=np.random.uniform(-0.3, 0.3), dtheta=0)
+        AP = ArmPole(
+            x=np.random.uniform(-1.5, 1.5),
+            dx=0,
+            theta=np.random.uniform(-0.3, 0.3),
+            dtheta=0,
+        )
         xs, thetas, Fs, ts = simulate(params, AP, doublePID)
 
         if simple_plot:
@@ -171,7 +196,7 @@ def make_simulations(params, fname, simple_plot=False, doublePID = True):
 
         fig = plt.figure(figsize=(16, 9))
         gs = GridSpec(9, 16, figure=fig)
-        ax1 = fig.add_subplot(gs[:, :9], projection='3d')
+        ax1 = fig.add_subplot(gs[:, :9], projection="3d")
         ax2 = fig.add_subplot(gs[:3, 9:])
         ax3 = fig.add_subplot(gs[3:6, 9:])
         ax4 = fig.add_subplot(gs[6:, 9:])
@@ -196,29 +221,49 @@ def make_simulations(params, fname, simple_plot=False, doublePID = True):
         for i in tqdm(range(len(xs))):
             # Data for a three-dimensional line
             phi = xs[i] / AP.position_limit * 2 * np.pi
-            a1, = ax1.plot3D([0, np.cos(phi)], [0, np.sin(phi)], [0, 0], 'gray')
-            a2, = ax1.plot3D([0, 1], [0, 0], [0, 0], 'red', linestyle="--")
-            a3, = ax1.plot3D([np.cos(phi), np.cos(phi) + 2 * LROD * np.sin(-phi) * np.sin(thetas[i])],
-                             [np.sin(phi), np.sin(phi) + 2 * LROD * np.cos(-phi) * np.sin(thetas[i])],
-                             [0, 2 * LROD * np.cos(thetas[i])], 'black')
-            a4, = ax2.plot(ts[:i], thetas[:i], "blue")
-            a5, = ax3.plot(ts[:i], xs[:i], "blue")
-            a6, = ax4.plot(ts[:i], Fs[:i], "blue")
-            plt.savefig(f"tmp.png")
+            (a1,) = ax1.plot3D(
+                [0, np.cos(phi)], [0, np.sin(phi)], [0, 0], "gray"
+            )
+            (a2,) = ax1.plot3D([0, 1], [0, 0], [0, 0], "red", linestyle="--")
+            (a3,) = ax1.plot3D(
+                [
+                    np.cos(phi),
+                    np.cos(phi) + 2 * LROD * np.sin(-phi) * np.sin(thetas[i]),
+                ],
+                [
+                    np.sin(phi),
+                    np.sin(phi) + 2 * LROD * np.cos(-phi) * np.sin(thetas[i]),
+                ],
+                [0, 2 * LROD * np.cos(thetas[i])],
+                "black",
+            )
+            (a4,) = ax2.plot(ts[:i], thetas[:i], "blue")
+            (a5,) = ax3.plot(ts[:i], xs[:i], "blue")
+            (a6,) = ax4.plot(ts[:i], Fs[:i], "blue")
+            buf = BytesIO()
+            plt.savefig(buf, format="png")
+            buf.seek(0)
+            images.append(imageio.imread(buf))
             a1.remove()
             a2.remove()
             a3.remove()
             a4.remove()
             a5.remove()
             a6.remove()
-            images.append(imageio.imread(f"tmp.png"))
 
-    imageio.mimsave(fname, images, duration=TIME_STEP)
+        imageio.mimsave(fname, images, duration=TIME_STEP)
 
 
 def main():
     # guess = [18, 7, 11]
-    guess = [31.6084103, 7.21465755, 27.33140888, 3.5096769, 1.3153921, 0.04832309]
+    guess = [
+        31.6084103,
+        7.21465755,
+        27.33140888,
+        3.5096769,
+        1.3153921,
+        0.04832309,
+    ]
     guess = [30, 7, 30, 3.5, 1.3, 0.05]
     fname = "movie.gif"
 
@@ -227,8 +272,8 @@ def main():
     fit = minimize(err_func, guess)
     print(fit)
 
-    make_simulations(fit.x, fname, True, doublePID=len(guess) == 6)
+    make_simulations(fit.x, fname, False, doublePID=len(guess) == 6)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
